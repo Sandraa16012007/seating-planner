@@ -9,15 +9,12 @@ export default function Home() {
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 pb-16 sm:px-6 lg:px-8">
       <header className="flex items-center justify-between gap-3 border-b border-stone-200/80 py-4">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand text-white shadow-sm">
-            <span className="font-serif text-lg leading-none">F</span>
-          </div>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold leading-tight text-ink sm:text-base">
               Farewell Seating Planner
             </p>
             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-stone-500 sm:text-[11px]">
-              College Farewell · 2026
+              Farewell · 2026-2027
             </p>
           </div>
         </div>
@@ -30,9 +27,6 @@ export default function Home() {
 
       <main className="flex-1">
         <section className="mx-auto max-w-2xl pb-8 pt-10 text-center sm:pb-10 sm:pt-14">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand/70">
-            Find your seat
-          </p>
           <h1 className="mt-3 text-balance font-serif text-4xl leading-[1.03] text-ink sm:text-6xl">
             Find your table.
             <br />

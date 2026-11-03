@@ -1,14 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Playfair_Display } from "next/font/google";
+import { Geist, Playfair_Display } from "next/font/google";
 import "./globals.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
   subsets: ["latin"],
 });
 
@@ -21,7 +16,7 @@ const playfair = Playfair_Display({
 export const metadata: Metadata = {
   title: "Farewell Seating Planner | Find your table",
   description:
-    "Find your table and see who is seated with you at the college farewell. 22 tables, 153 seats.",
+    "Find your table and see who is seated with you at the farewell. 22 tables, 153 seats.",
   applicationName: "Farewell Seating Planner",
 };
 
@@ -32,7 +27,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
-      className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${playfair.variable} h-full antialiased`}
       lang="en"
     >
       <body className="flex min-h-full flex-col text-ink">{children}</body>

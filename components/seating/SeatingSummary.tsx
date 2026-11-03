@@ -12,11 +12,17 @@ export default function SeatingSummary({ plan }: SeatingSummaryProps) {
     0,
   );
   const availableSeats = Math.max(0, totalSeats - occupiedSeats);
+  const occupancyPercentage =
+    totalSeats > 0 ? Math.round((occupiedSeats / totalSeats) * 100) : 0;
 
   const stats = [
     { label: "Tables", value: totalTables, hint: "fixed layout" },
     { label: "Total seats", value: totalSeats, hint: "capacity" },
-    { label: "Occupied", value: occupiedSeats, hint: "seats taken" },
+    {
+      label: "Occupied",
+      value: occupiedSeats,
+      hint: `${occupancyPercentage}% of seats`,
+    },
     {
       label: "Available",
       value: availableSeats,

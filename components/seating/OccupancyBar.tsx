@@ -33,6 +33,7 @@ export default function OccupancyBar({
       aria-valuemax={capacity}
       aria-valuemin={0}
       aria-valuenow={occupied}
+      aria-valuetext={`${occupied} of ${capacity} seats (${percentage}%)`}
       className={`overflow-hidden rounded-full bg-stone-100 ${
         size === "md" ? "h-2" : "h-1.5"
       } ${className}`}

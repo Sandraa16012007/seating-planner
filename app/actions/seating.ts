@@ -28,9 +28,13 @@ function getTableNumber(formData: FormData) {
 function addErrorMessage(error: SeatingError) {
   switch (error.code) {
     case "23505":
-      return error.message || "That student is already seated.";
+      return /already seated/i.test(error.message)
+        ? error.message
+        : "A student with this name is already seated.";
     case "23514":
-      return error.message || "That table is already full.";
+      return /full|capacity/i.test(error.message)
+        ? error.message
+        : "That table is already full.";
     case "23503":
       return "That table does not exist. Choose another table.";
     case "22001":

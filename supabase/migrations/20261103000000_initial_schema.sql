@@ -160,6 +160,8 @@ declare
   v_student public.students;
   v_name text;
   v_class_section text;
+  v_existing_name text;
+  v_existing_table smallint;
 begin
   -- Store a tidy display value as well as the generated normalized value.
   v_name := btrim(regexp_replace(coalesce(p_name, ''), '\s+', ' ', 'g'));
@@ -194,6 +196,20 @@ begin
       using errcode = '22023';
   end if;
 
+  -- Return a useful message before attempting the insert. The unique
+  -- constraint below still closes the race between this check and the insert.
+  select s.name, s.table_number
+    into v_existing_name, v_existing_table
+    from public.students s
+   where s.name_normalized = public.normalize_student_name(v_name)
+   limit 1;
+
+  if found then
+    raise exception '% is already seated at Table %. A student can only be seated once.',
+      v_existing_name, v_existing_table
+      using errcode = '23505';
+  end if;
+
   insert into public.students (name, class_section, table_number)
   values (v_name, v_class_section, p_table_number)
   returning * into v_student;
@@ -201,6 +217,20 @@ begin
   return v_student;
 exception
   when unique_violation then
+    -- A simultaneous request may have inserted the same normalized name after
+    -- the check above. Look it up again so the visitor still gets the table.
+    select s.name, s.table_number
+      into v_existing_name, v_existing_table
+      from public.students s
+     where s.name_normalized = public.normalize_student_name(v_name)
+     limit 1;
+
+    if v_existing_table is not null then
+      raise exception '% is already seated at Table %. A student can only be seated once.',
+        v_existing_name, v_existing_table
+        using errcode = '23505';
+    end if;
+
     raise exception 'A student with this name is already seated.'
       using errcode = '23505';
 end;

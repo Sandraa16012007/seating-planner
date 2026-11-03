@@ -39,6 +39,7 @@ export default function AddStudentForm({
   const [serverError, setServerError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const submittingRef = useRef(false);
   const formId = useId();
   const nameId = `${formId}-name`;
   const classId = `${formId}-class`;
@@ -93,7 +94,7 @@ export default function AddStudentForm({
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (submitting) {
+    if (submitting || submittingRef.current) {
       return;
     }
 
@@ -128,6 +129,7 @@ export default function AddStudentForm({
     setSuccessMessage(null);
 
     const formData = new FormData(event.currentTarget);
+    submittingRef.current = true;
     setSubmitting(true);
 
     try {
@@ -150,6 +152,7 @@ export default function AddStudentForm({
       setServerError("Something went wrong. Please try again.");
       setSuccessMessage(null);
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   }

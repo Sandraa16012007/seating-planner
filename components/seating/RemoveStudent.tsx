@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 
 import { removeStudentAction } from "@/app/actions/seating";
 import { TrashIcon } from "@/components/ui/icons";
@@ -71,16 +71,18 @@ function RemoveStudentConfirm({
 }: RemoveStudentConfirmProps) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const removingRef = useRef(false);
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (pending) {
+    if (pending || removingRef.current) {
       return;
     }
 
     setError(null);
     const formData = new FormData(event.currentTarget);
+    removingRef.current = true;
 
     startTransition(async () => {
       try {
@@ -94,6 +96,8 @@ function RemoveStudentConfirm({
         onRemoved(student.name);
       } catch {
         setError("Something went wrong. Please try again.");
+      } finally {
+        removingRef.current = false;
       }
     });
   }
