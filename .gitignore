@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -39,3 +40,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+supabase/.branches/
+supabase/.temp/
+# local supabase branches
+/supabase/.branches/
+
+# local temp files used during preview deployments
+/supabase/.temp/
+
+# migration previews
+/supabase/migrations/.preview/
