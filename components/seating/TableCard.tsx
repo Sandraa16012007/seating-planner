@@ -1,78 +1,129 @@
+"use client";
+
+import OccupancyBar from "@/components/seating/OccupancyBar";
+import TableStatusBadge from "@/components/seating/TableStatusBadge";
+import { PlusIcon } from "@/components/ui/icons";
+import { getOpenSeats, getTableStatus } from "@/lib/table-status";
 import type { SeatingTable } from "@/types/seating";
 
 type TableCardProps = {
   table: SeatingTable;
+  onOpenDetails: (tableNumber: number) => void;
+  onAddStudent: (tableNumber: number) => void;
 };
 
-export default function TableCard({ table }: TableCardProps) {
+export default function TableCard({
+  table,
+  onOpenDetails,
+  onAddStudent,
+}: TableCardProps) {
   const occupied = table.students.length;
-  const openSeats = Math.max(0, table.capacity - occupied);
-  const isFull = openSeats === 0;
-  const fillPercentage = Math.min(
-    100,
-    Math.round((occupied / table.capacity) * 100),
-  );
+  const openSeats = getOpenSeats(table);
+  const status = getTableStatus(table);
+  const isFull = status === "full";
+  const visibleStudents = table.students.slice(0, 3);
+  const hiddenCount = table.students.length - visibleStudents.length;
 
   return (
-    <article className="flex flex-col rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-base font-semibold tracking-tight text-stone-900">
-            Table {table.tableNumber}
-          </h3>
-          <p className="mt-0.5 text-xs text-stone-400">
-            {occupied} of {table.capacity} seats taken
-          </p>
+    <article
+      className={`group relative flex h-full flex-col overflow-hidden rounded-2xl border p-4 shadow-[0_12px_40px_-32px_rgba(45,30,35,0.45)] transition duration-200 hover:-translate-y-0.5 hover:border-brand/20 hover:shadow-[0_18px_50px_-30px_rgba(45,30,35,0.35)] ${
+        isFull
+          ? "border-rose-200/80 bg-rose-50/30"
+          : "border-white/80 bg-white/80"
+      }`}
+    >
+      <button
+        aria-label={`View Table ${table.tableNumber} details, ${occupied} of ${table.capacity} seats taken`}
+        className="absolute inset-0 z-10 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/40"
+        onClick={() => onOpenDetails(table.tableNumber)}
+        type="button"
+      />
+
+      <div className="pointer-events-none relative z-20 flex h-full flex-col">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-500">
+              Table
+            </p>
+            <h3 className="mt-0.5 font-serif text-2xl leading-none text-ink">
+              {table.tableNumber}
+            </h3>
+          </div>
+          <TableStatusBadge status={status} />
         </div>
 
-        <span
-          className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-            isFull
-              ? "bg-rose-50 text-rose-600"
-              : "bg-emerald-50 text-emerald-700"
-          }`}
-        >
-          {isFull ? "Full" : `${openSeats} open`}
-        </span>
-      </div>
+        <div className="mt-3 flex items-center justify-between gap-2 text-xs">
+          <span className="font-medium text-stone-500">
+            {occupied} of {table.capacity} seated
+          </span>
+          <span className="text-stone-500">
+            {openSeats === 0
+              ? "No seats left"
+              : `${openSeats} ${openSeats === 1 ? "seat" : "seats"} open`}
+          </span>
+        </div>
 
-      <div
-        aria-label={`Table ${table.tableNumber} occupancy`}
-        aria-valuemax={table.capacity}
-        aria-valuemin={0}
-        aria-valuenow={occupied}
-        className="mt-3 h-1.5 overflow-hidden rounded-full bg-stone-100"
-        role="progressbar"
-      >
-        <div
-          className={`h-full rounded-full ${
-            isFull ? "bg-rose-400" : "bg-amber-500"
-          }`}
-          style={{ width: `${fillPercentage}%` }}
+        <OccupancyBar
+          capacity={table.capacity}
+          className="mt-2"
+          label={`Table ${table.tableNumber} occupancy`}
+          occupied={occupied}
+          status={status}
         />
-      </div>
 
-      {occupied === 0 ? (
-        <p className="mt-4 rounded-xl border border-dashed border-stone-200 px-3 py-5 text-center text-sm text-stone-400">
-          No one seated yet
-        </p>
-      ) : (
-        <ul className="mt-3 divide-y divide-stone-100">
-          {table.students.map((student) => (
-            <li
-              className="flex items-start justify-between gap-3 py-2.5"
-              key={student.id}
-            >
-              <span className="min-w-0 break-words text-sm font-medium leading-5 text-stone-800">
-                {student.name}
-              </span>
-              <span className="shrink-0 rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-stone-500">
-                {student.classSection}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
+        <div className="mt-3 flex-1">
+          {occupied === 0 ? (
+            <div className="flex min-h-16 items-center justify-center rounded-xl border border-dashed border-stone-200/80 bg-white/40 px-3 py-3 text-center text-xs text-stone-500">
+              No one seated yet
+            </div>
+          ) : (
+            <ul className="space-y-1.5">
+              {visibleStudents.map((student) => (
+                <li
+                  className="flex min-w-0 items-center justify-between gap-2"
+                  key={student.id}
+                >
+                  <span className="min-w-0 break-words text-sm font-medium leading-5 text-stone-700">
+                    {student.name}
+                  </span>
+                  <span
+                    className="max-w-[42%] shrink-0 truncate rounded-full bg-stone-100/90 px-2 py-0.5 text-[11px] font-medium text-stone-500"
+                    title={student.classSection}
+                  >
+                    {student.classSection}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {hiddenCount > 0 ? (
+            <p className="mt-2 text-[11px] font-medium text-stone-500">
+              +{hiddenCount} more {hiddenCount === 1 ? "student" : "students"}
+            </p>
+          ) : null}
+        </div>
+
+        <button
+          className={`pointer-events-auto mt-3 inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl px-3 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
+            isFull
+              ? "pointer-events-none bg-stone-100 text-stone-400"
+              : "bg-brand text-white hover:bg-brand-dark active:scale-[0.99]"
+          }`}
+          disabled={isFull}
+          onClick={() => onAddStudent(table.tableNumber)}
+          type="button"
+        >
+          {isFull ? (
+            "Table full"
+          ) : (
+            <>
+              <PlusIcon className="h-4 w-4" />
+              Add student
+            </>
+          )}
+        </button>
+      </div>
     </article>
   );
 }

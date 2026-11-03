@@ -9,15 +9,19 @@ Anyone with the link can view the shared seating arrangement. There are no accou
 
 ## Current stage
 
-This repository contains the **foundation** for the app:
+The app is a working, mobile-first planner:
 
 - Next.js App Router project with TypeScript and Tailwind CSS
 - Supabase schema, constraints, RPCs, and RLS policies
-- Typed Supabase integration and a separate data-access module
-- A read-only, mobile-first seating board that loads the shared plan from Supabase
-- `addStudent` / `removeStudent` data functions ready for the editing UI
+- Request-time server rendering of all 22 tables and their students
+- Seating overview with total, occupied, and available seat counts
+- Responsive table cards with occupancy states, progress bars, and student previews
+- Table detail sheet/modal with the full student list and remove controls
+- Add-student form with table preselection, validation, pending state, and inline success/error feedback
+- Server Actions for add/remove, with the database enforcing uniqueness and capacity
+- Confirmation before removing a student and a public-access warning in the footer
 
-The add/remove forms and live refresh are intentionally **not** built yet. See [Next steps](#next-steps).
+The UI is complete for the current scope. Changes are visible to other visitors after they refresh. Realtime updates and automated tests are intentionally out of scope for this stage. See [Next steps](#next-steps).
 
 ## Stack
 
@@ -26,7 +30,7 @@ The add/remove forms and live refresh are intentionally **not** built yet. See [
 - Tailwind CSS 4
 - [Supabase](https://supabase.com/) (Postgres, RLS, RPC)
 
-No auth library, state manager, or localStorage caching is used. Supabase is the single source of truth.
+No auth library, global state manager, or localStorage caching is used. React local state handles the modal and forms; Supabase is the single source of truth.
 
 ## Quick start
 
@@ -104,25 +108,43 @@ That is acceptable for a trusted college farewell group, but it is **not** a pri
 
 ```text
 app/
-  layout.tsx                  Root layout, fonts, metadata
-  page.tsx                    Home route: header, Suspense boundary, footer
-  globals.css                 Tailwind entry + base theme
+  actions/
+    seating.ts                Server Actions for add/remove
+  error.tsx                  Route error boundary
+  layout.tsx                 Root layout, fonts, metadata
+  page.tsx                   Home route: header, hero, Suspense, footer
+  globals.css                Tailwind entry + theme + motion
 
 components/
   seating/
     SeatingBoard.tsx          Server data container (env check + fetch)
-    TableGrid.tsx             Summary + responsive grid
-    TableCard.tsx             One table's seats and students
+    SeatingPlanner.tsx        Client orchestrator for views, refresh, notices
+    SeatingSummary.tsx        Tables/seats/occupied/available stats
+    TableGrid.tsx             Responsive grid + status legend
+    TableCard.tsx             Compact table card with occupancy and add button
+    TableDetails.tsx          Full table details and remove controls
+    RemoveStudent.tsx         Inline remove confirmation form
+    AddStudentForm.tsx        Add-student form + validation feedback
+    TableStatusBadge.tsx      Empty/available/1-left/full badge
+    OccupancyBar.tsx          Reusable progress bar
     TableGridSkeleton.tsx     Suspense fallback
     SetupNotice.tsx           Shown when Supabase env is missing
+    DatabaseError.tsx         Shown when the plan cannot be loaded
+  ui/
+    Modal.tsx                 Native dialog (bottom sheet on mobile)
+    Spinner.tsx               Pending indicator
+    icons.tsx                 Inline SVG icons
 
 lib/
   constants.ts                22 tables, capacities, input limits
   seating.ts                  Server-only DB reads/writes + domain mapping
+  seating-validation.ts       Shared client/server form validation
+  table-status.ts             Occupancy/status helpers
   supabase/
     server.ts                 Env validation + anonymous Supabase client
 
 types/
+  actions.ts                  Server Action result types
   database.ts                 Supabase schema types (manual, migration-aligned)
   seating.ts                  App-facing domain types
 
@@ -131,16 +153,21 @@ supabase/
     20261103000000_initial_schema.sql
 ```
 
-`hooks/` is intentionally absent. No client-side state is needed in this stage.
+There is no global state library or browser-side database client. The only client state is UI state for the modal, form, pending actions, and inline notices.
 
 ## Module responsibilities
 
 | Module | Responsibility | Must not |
 | --- | --- | --- |
-| `app/page.tsx` | Route composition, static heading, Suspense fallback | Talk to the database |
-| `components/seating/SeatingBoard.tsx` | Request-time env check and data loading | Render low-level table markup |
-| `components/seating/TableGrid.tsx` `TableCard.tsx` | Presentation only | Know about Supabase or SQL |
+| `app/page.tsx` | Route composition, header/hero, Suspense fallback | Talk to the database |
+| `components/seating/SeatingBoard.tsx` | Request-time env check and data loading | Own interactive UI state |
+| `components/seating/SeatingPlanner.tsx` | Client modal routing, refresh, and notices | Talk to Supabase directly |
+| `components/seating/TableGrid.tsx` `TableCard.tsx` | Card presentation and table selection callbacks | Know about SQL |
+| `components/seating/TableDetails.tsx` `AddStudentForm.tsx` `RemoveStudent.tsx` | Detail/form interactions, validation feedback, pending states | Talk to Supabase directly |
+| `app/actions/seating.ts` | Validate form data, call the data layer, map errors, return serializable results | Contain JSX |
 | `lib/seating.ts` | Queries, RPC calls, snake_case → camelCase mapping, `SeatingError` | Import React or UI code |
+| `lib/seating-validation.ts` | Shared name/class/table validation | Access the database |
+| `lib/table-status.ts` | Occupancy and empty/available/1-left/full helpers | Access the database |
 | `lib/supabase/server.ts` | Validate env and create the anonymous client | Contain business rules |
 | `types/database.ts` | Database row/insert/update/RPC types | Contain UI concerns |
 | `types/seating.ts` | App-facing `Student`, `SeatingTable`, `SeatingPlan` | Mirror raw database column names |
@@ -148,7 +175,7 @@ supabase/
 
 ## How the modules communicate
 
-### Reading the plan (implemented)
+### Reading the plan
 
 ```text
 Browser
@@ -160,26 +187,34 @@ Browser
               │    ├─ select seating_tables (22 rows)
               │    └─ select students
               │         └─ map snake_case rows → camelCase domain objects
-              └─ components/seating/TableGrid.tsx → TableCard.tsx
+              └─ components/seating/SeatingPlanner.tsx
+                   ├─ SeatingSummary.tsx
+                   └─ TableGrid.tsx → TableCard.tsx
 ```
 
 - `SeatingBoard` calls `connection()` so the data is fetched at request time, not baked in at build time.
 - `lib/seating.ts` returns a **domain** `SeatingPlan`; components never see raw database rows.
 - If fewer than 22 tables come back, `getSeatingPlan` throws a configuration error instead of silently showing a partial plan.
+- The modal and forms are client-side, but the plan itself stays server-rendered. After a successful mutation, `router.refresh()` updates the server tree without discarding the open modal.
 
-### Writing (data layer ready, UI not built)
-
-The intended flow for the next stage:
+### Writing
 
 ```text
-Client form
-  └─ Server Action (app/actions/seating.ts, to be added)
-      └─ lib/seating.ts#addStudent() / #removeStudent()
-          └─ supabase.rpc("add_student") / supabase.rpc("remove_student")
-              └─ Postgres trigger + unique constraint + RLS
+Table card / table details / remove confirmation
+  └─ Client component
+      ├─ validates name/class/table locally
+      └─ calls a Server Action in app/actions/seating.ts
+          └─ lib/seating.ts#addStudent() / #removeStudent()
+              └─ supabase.rpc("add_student") / supabase.rpc("remove_student")
+                  └─ Postgres trigger + unique constraint + RLS
+      └─ on success: inline feedback + router.refresh()
 ```
 
-Keeping writes in Server Actions avoids exposing a second mutation path in the browser. The anon key is still used server-side, and the database remains the authority.
+- Writes never go directly from the browser to Supabase. The browser only invokes Server Actions.
+- The Server Actions repeat the form validation; the database remains the final authority.
+- Successful changes trigger `router.refresh()` so the server-rendered plan and all visible counts update.
+- Other visitors see changes when they refresh the page. No realtime subscription is used.
+- Add success keeps the form open so several friends can be added in a row. Removal uses an inline confirmation.
 
 ## Database design
 
@@ -237,7 +272,7 @@ The capacity trigger is a database-level backstop even if someone later changes 
 
 ## Input limits
 
-The frontend should mirror these before submitting, but the database is authoritative:
+The client validates these in `lib/seating-validation.ts` and the Server Actions repeat the checks, but the database is authoritative:
 
 - Name: 1–80 characters after trimming
 - Class/section: 1–40 characters after trimming
@@ -254,10 +289,8 @@ npm run lint    # ESLint
 
 ## Next steps
 
-1. Add `app/actions/seating.ts` with `addStudentAction` and `removeStudentAction` Server Actions.
-2. Add a client form per table (name + class/section) with pending state and friendly constraint errors.
-3. Add a remove control for each entry.
-4. Refresh the page after mutations (`refresh()` / `revalidatePath`), and optionally refetch on window focus so other visitors' changes appear.
-5. Add tests for the RPCs, especially concurrent inserts into the last seat and duplicate normalized names.
+1. Add automated tests for the Server Actions and RPCs, especially concurrent inserts into the last seat and duplicate normalized names.
+2. Optionally add a Supabase Realtime subscription or refresh-on-focus so other visitors' changes appear without a manual reload.
+3. If the audience stops being trusted, add authentication, moderation, and rate limiting.
 
 Realtime subscriptions and localStorage are optional and not needed for correctness.
