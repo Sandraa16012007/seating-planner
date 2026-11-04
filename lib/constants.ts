@@ -1,8 +1,8 @@
-export const TABLE_COUNT = 22;
-export const STANDARD_TABLE_CAPACITY = 7;
-export const FINAL_TABLE_CAPACITY = 6;
+export const TABLE_COUNT = 19;
+export const STANDARD_TABLE_CAPACITY = 8;
+export const FINAL_TABLE_CAPACITY = 9;
 
-/** 21 tables x 7 seats + 1 table x 6 seats = 153. */
+/** 18 tables x 8 seats + 1 table x 9 seats = 153. */
 export const TOTAL_CAPACITY =
   (TABLE_COUNT - 1) * STANDARD_TABLE_CAPACITY + FINAL_TABLE_CAPACITY;
 

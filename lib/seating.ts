@@ -32,7 +32,7 @@ function mapStudent(row: StudentRecord): Student {
 }
 
 /**
- * Loads all 22 tables and their students. Missing tables are treated as a
+ * Loads all 19 tables and their students. Missing tables are treated as a
  * configuration error so the app never silently shows a partial plan.
  */
 export async function getSeatingPlan(): Promise<SeatingPlan> {

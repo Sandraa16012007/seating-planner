@@ -7,7 +7,7 @@ export type Student = {
   createdAt: string;
 };
 
-/** One of the 22 fixed tables, including the students seated there. */
+/** One of the 19 fixed tables, including the students seated there. */
 export type SeatingTable = {
   tableNumber: number;
   capacity: number;

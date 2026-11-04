@@ -16,7 +16,7 @@ const playfair = Playfair_Display({
 export const metadata: Metadata = {
   title: "Farewell Seating Planner | Find your table",
   description:
-    "Find your table and see who is seated with you at the farewell. 22 tables, 153 seats.",
+    "Find your table and see who is seated with you at the farewell. 19 tables, 153 seats.",
   applicationName: "Farewell Seating Planner",
 };
 

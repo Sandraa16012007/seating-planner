@@ -1,9 +1,9 @@
 # Farewell Seating Planner
 
-A small, mobile-first seating planner for a farewell. There are exactly 22 tables and 153 seats:
+A small, mobile-first seating planner for a farewell. There are exactly 19 tables and 153 seats:
 
-- Tables 1–21: 7 students each
-- Table 22: 6 students
+- Tables 1–18: 8 students each
+- Table 19: 9 students
 
 Anyone with the link can view the shared seating arrangement. There are no accounts, logins, or user roles.
 
@@ -13,7 +13,7 @@ The app is a working, mobile-first planner:
 
 - Next.js App Router project with TypeScript and Tailwind CSS
 - Supabase schema, constraints, RPCs, and RLS policies
-- Request-time server rendering of all 22 tables and their students
+- Request-time server rendering of all 19 tables and their students
 - Seating overview with total, occupied, and available seat counts
 - Responsive table cards with occupancy states, progress bars, and student previews
 - Table detail sheet/modal with the full student list and remove controls
@@ -63,8 +63,7 @@ Use either option:
 **Supabase Dashboard (simplest)**
 
 1. Open your project → **SQL Editor**.
-2. Run `supabase/migrations/20261103000000_initial_schema.sql`.
-3. Run `supabase/migrations/20261103010000_duplicate_name_message.sql` if this project already had the first migration applied. The second file is idempotent and safe on a fresh project too.
+2. Run every file in `supabase/migrations/` in filename order. On a project created before the resize, make sure `20261104000000_resize_to_19_tables.sql` is included; it is idempotent and safe on a fresh project too.
 
 **Supabase CLI**
 
@@ -80,7 +79,7 @@ select table_number, capacity
 from public.seating_tables
 order by table_number;
 
--- Should return 22 rows: 1-21 with capacity 7, 22 with capacity 6.
+-- Should return 19 rows: 1-18 with capacity 8, 19 with capacity 9.
 ```
 
 ### 3. Add environment variables
@@ -100,7 +99,7 @@ The anon key is safe to expose only because RLS restricts what it can do. **Neve
 
 ### Vercel
 
-1. Apply both migrations to the Supabase project that production will use.
+1. Apply all migrations in `supabase/migrations/` to the Supabase project that production will use.
 2. Push the repository to GitHub and import it into Vercel (or deploy with the Vercel CLI). Vercel detects Next.js automatically.
 3. Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` to the project's environment variables for Production, Preview, and Development.
 4. Deploy. The build command is `npm run build`.
@@ -161,7 +160,7 @@ components/
     icons.tsx                 Inline SVG icons
 
 lib/
-  constants.ts                22 tables, capacities, input limits
+  constants.ts                19 tables, capacities, input limits
   seating.ts                  Server-only DB reads/writes + domain mapping
   seating-validation.ts       Shared client/server form validation
   table-status.ts             Occupancy/status helpers
@@ -177,6 +176,7 @@ supabase/
   migrations/
     20261103000000_initial_schema.sql
     20261103010000_duplicate_name_message.sql
+    20261104000000_resize_to_19_tables.sql
 ```
 
 There is no global state library or browser-side database client. The only client state is UI state for the modal, form, pending actions, and inline notices.
@@ -210,7 +210,7 @@ Browser
           └─ <Suspense> → components/seating/SeatingBoard.tsx
               ├─ lib/supabase/server.ts → anonymous Supabase client
               ├─ lib/seating.ts#getSeatingPlan()
-              │    ├─ select seating_tables (22 rows)
+              │    ├─ select seating_tables (19 rows)
               │    └─ select students
               │         └─ map snake_case rows → camelCase domain objects
               └─ components/seating/SeatingPlanner.tsx
@@ -220,7 +220,7 @@ Browser
 
 - `SeatingBoard` calls `connection()` so the data is fetched at request time, not baked in at build time.
 - `lib/seating.ts` returns a **domain** `SeatingPlan`; components never see raw database rows.
-- If fewer than 22 tables come back, `getSeatingPlan` throws a configuration error instead of silently showing a partial plan.
+- If fewer than 19 tables come back, `getSeatingPlan` throws a configuration error instead of silently showing a partial plan.
 - The modal and forms are client-side, but the plan itself stays server-rendered. After a successful mutation, `router.refresh()` updates the server tree without discarding the open modal.
 
 ### Writing
@@ -248,10 +248,10 @@ Table card / table details / remove confirmation
 
 | Column | Type | Notes |
 | --- | --- | --- |
-| `table_number` | `smallint` | Primary key, 1–22 |
-| `capacity` | `smallint` | 7 for tables 1–21; 6 for table 22, enforced by a CHECK |
+| `table_number` | `smallint` | Primary key, 1–19 |
+| `capacity` | `smallint` | 8 for tables 1–18; 9 for table 19, enforced by a CHECK |
 
-The migration seeds all 22 rows. Empty tables still exist.
+The migration seeds all 19 rows. Empty tables still exist.
 
 ### `public.students`
 
@@ -283,8 +283,8 @@ So `" Sandra   Prince "`, `"sandra prince"`, and `"SANDRA PRINCE"` all normalize
 
 | Rule | Enforcement |
 | --- | --- |
-| Exactly 22 tables | Seeded rows + no public write access |
-| Table capacities 7/7/…/6 | `seating_tables_capacity_matches_rules` CHECK |
+| Exactly 19 tables | Seeded rows + no public write access |
+| Table capacities 8/8/…/9 | `seating_tables_capacity_matches_rules` CHECK |
 | Unique student name, case/space-insensitive | Generated `name_normalized` + `students_name_normalized_unique` |
 | One table per student | `students.table_number` is a single non-null FK |
 | No over-capacity table | `BEFORE INSERT OR UPDATE` trigger locks the `seating_tables` row with `SELECT ... FOR UPDATE`, counts occupants, and rejects if full |
@@ -302,7 +302,7 @@ The client validates these in `lib/seating-validation.ts` and the Server Actions
 
 - Name: 1–80 characters after trimming
 - Class/section: 1–40 characters after trimming
-- Table number: 1–22
+- Table number: 1–19
 
 ## Verification
 
@@ -310,16 +310,16 @@ The live Supabase project and the running app were tested with temporary test ro
 
 | Area | Result |
 | --- | --- |
-| Schema | 22 tables; capacities 7 for tables 1–21 and 6 for table 22; total 153 seats |
+| Schema | 19 tables; capacities 8 for tables 1–18 and 9 for table 19; total 153 seats |
 | Basic writes | Add to an empty table, multiple students to one table, students to different tables, delete, and re-add a deleted name all passed |
 | Duplicate names | `Sandra Prince`, `sandra prince`, `SANDRA PRINCE`, `Sandra  Prince`, and `" Sandra Prince "` were rejected with a message naming the table already holding the student |
-| Table capacity | Table 1 accepted 7 and rejected an 8th (`23514`); table 22 accepted 6 and rejected a 7th (`23514`) |
+| Table capacity | Table 1 accepted 8 and rejected a 9th (`23514`); table 19 accepted 9 and rejected a 10th (`23514`) |
 | Concurrent duplicate | Two simultaneous normalized-name inserts produced exactly one row and one `23505` error naming the winning table |
-| Concurrent last seat | Two simultaneous inserts for the final seat at table 22 produced one success and one `23514`; the table stayed at 6 |
+| Concurrent last seat | Two simultaneous inserts for the final seat at table 19 produced one success and one `23514`; the table stayed at 9 |
 | Direct access | Anonymous direct `insert` and `delete` on `students` were denied; RPCs are the write path |
 | Persistence | A second Supabase client and a fresh server render both saw a new row; a fresh render no longer showed it after deletion |
 | Responsive UI | 390 px, 768 px, and 1280 px viewports had no horizontal overflow; the mobile dialog did not overflow; details, add, success, remove confirmation, and removal feedback worked |
-| Full-table UI | A table with 7 students showed `Full`/`No seats left`, hid the card add action, and disabled the details add button |
+| Full-table UI | A table with 8 students showed `Full`/`No seats left`, hid the card add action, and disabled the details add button |
 | Duplicate UI | The add form displayed `Sandra Prince is already seated at Table 1. A student can only be seated once.` |
 | Build checks | `npx tsc --noEmit`, `npm run lint`, and `npm run build` passed |
 | Production smoke | `next start` served the built app; the mobile layout and duplicate error above worked against the production server |
