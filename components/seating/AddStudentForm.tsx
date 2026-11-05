@@ -10,6 +10,13 @@ import {
   MAX_STUDENT_NAME_LENGTH,
 } from "@/lib/constants";
 import {
+  generateOwnershipToken,
+  readOwnershipToken,
+  saveOwnershipToken,
+} from "@/lib/ownership-token";
+import {
+  findNameConflict,
+  hasMultipleNameSeparators,
   validateStudentForm,
   type StudentFormErrors,
 } from "@/lib/seating-validation";
@@ -20,14 +27,23 @@ type AddStudentFormProps = {
   plan: SeatingPlan;
   initialTableNumber: number;
   cancelLabel?: string;
+  /** True once this browser already owns a student entry. */
+  registrationLocked?: boolean;
   onCancel: () => void;
-  onAdded: () => void;
+  onAdded: (studentId: string, ownershipToken: string) => void;
+};
+
+type RegisteredState = {
+  message: string;
+  studentName: string;
+  tableNumber: number;
 };
 
 export default function AddStudentForm({
   plan,
   initialTableNumber,
   cancelLabel = "Cancel",
+  registrationLocked = false,
   onCancel,
   onAdded,
 }: AddStudentFormProps) {
@@ -37,7 +53,7 @@ export default function AddStudentForm({
   const [tableNumber, setTableNumber] = useState(initialTableNumber);
   const [fieldErrors, setFieldErrors] = useState<StudentFormErrors>({});
   const [serverError, setServerError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [registered, setRegistered] = useState<RegisteredState | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const submittingRef = useRef(false);
   const formId = useId();
@@ -45,6 +61,7 @@ export default function AddStudentForm({
   const classId = `${formId}-class`;
   const tableId = `${formId}-table`;
   const nameErrorId = `${formId}-name-error`;
+  const nameWarningId = `${formId}-name-warning`;
   const classErrorId = `${formId}-class-error`;
   const tableErrorId = `${formId}-table-error`;
   const tableHintId = `${formId}-table-hint`;
@@ -55,10 +72,19 @@ export default function AddStudentForm({
   const openSeats = selectedTable ? getOpenSeats(selectedTable) : 0;
   const isTableFull = !selectedTable || openSeats === 0;
   const hasAnyOpenSeats = plan.some((table) => getOpenSeats(table) > 0);
+  const existingStudents = plan.flatMap((table) => table.students);
+  const hasNameSeparators = hasMultipleNameSeparators(name);
+  const nameConflict = hasNameSeparators
+    ? null
+    : findNameConflict(name, classSection, existingStudents);
+  const nameWarningMessage = hasNameSeparators
+    ? "Enter one student's name only. Commas and line breaks are not allowed."
+    : nameConflict?.message;
+  const nameHasBlockingConflict =
+    hasNameSeparators || nameConflict?.blocking === true;
 
   function clearFeedback() {
     setServerError(null);
-    setSuccessMessage(null);
   }
 
   function handleNameChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -94,11 +120,16 @@ export default function AddStudentForm({
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (submitting || submittingRef.current) {
+    if (submitting || submittingRef.current || registrationLocked) {
       return;
     }
 
     const errors = validateStudentForm({ name, classSection, tableNumber });
+    const conflict = findNameConflict(name, classSection, existingStudents);
+
+    if (conflict?.blocking) {
+      errors.name = conflict.message;
+    }
 
     if (!selectedTable) {
       errors.tableNumber = "Choose a valid table.";
@@ -109,7 +140,6 @@ export default function AddStudentForm({
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
       setServerError(null);
-      setSuccessMessage(null);
 
       const firstInvalid = (
         ["name", "classSection", "tableNumber"] as const
@@ -124,11 +154,23 @@ export default function AddStudentForm({
       return;
     }
 
+    // Keep the same token for every attempt from this browser. It is saved
+    // before the request so a successful registration remains recoverable even
+    // if the response is interrupted.
+    const ownershipToken = readOwnershipToken() ?? generateOwnershipToken();
+
+    if (!saveOwnershipToken(ownershipToken)) {
+      setServerError(
+        "This browser could not store your registration token. Enable site storage and try again.",
+      );
+      return;
+    }
+
     setFieldErrors({});
     setServerError(null);
-    setSuccessMessage(null);
 
     const formData = new FormData(event.currentTarget);
+    formData.set("ownershipToken", ownershipToken);
     submittingRef.current = true;
     setSubmitting(true);
 
@@ -136,21 +178,23 @@ export default function AddStudentForm({
       const result = await addStudentAction(formData);
 
       if (result.status === "success") {
-        setSuccessMessage(result.message);
         setServerError(null);
         setName("");
         setClassSection("");
-        onAdded();
+        setRegistered({
+          message: result.message,
+          studentName: result.studentName,
+          tableNumber: result.tableNumber,
+        });
+        onAdded(result.studentId, ownershipToken);
         return;
       }
 
       if (result.status === "error") {
         setServerError(result.message);
-        setSuccessMessage(null);
       }
     } catch {
       setServerError("Something went wrong. Please try again.");
-      setSuccessMessage(null);
     } finally {
       submittingRef.current = false;
       setSubmitting(false);
@@ -164,6 +208,35 @@ export default function AddStudentForm({
         : "border-stone-200 focus:border-brand/40 focus:ring-brand/10"
     }`;
 
+  if (registered) {
+    return (
+      <div className="space-y-4">
+        <div
+          className="toast-enter flex items-start gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-3 text-sm leading-5 text-emerald-800"
+          role="status"
+        >
+          <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+          <p>{registered.message}</p>
+        </div>
+
+        <p className="rounded-xl border border-stone-200 bg-stone-50 px-3.5 py-3 text-xs leading-5 text-stone-600">
+          This browser is now linked to {registered.studentName} at Table{" "}
+          {registered.tableNumber}. Only this browser can remove that entry.
+        </p>
+
+        <div className="flex justify-end">
+          <button
+            className="inline-flex min-h-11 items-center justify-center rounded-xl bg-brand px-4 text-sm font-semibold text-white transition hover:bg-brand-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
+            onClick={onCancel}
+            type="button"
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <form
       className="space-y-4"
@@ -171,16 +244,6 @@ export default function AddStudentForm({
       onSubmit={handleSubmit}
       ref={formRef}
     >
-      {successMessage ? (
-        <div
-          className="toast-enter flex items-start gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-3 text-sm leading-5 text-emerald-800"
-          role="status"
-        >
-          <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-          <p>{successMessage}</p>
-        </div>
-      ) : null}
-
       {serverError ? (
         <div
           className="flex items-start gap-2.5 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-3 text-sm leading-5 text-rose-800"
@@ -191,16 +254,33 @@ export default function AddStudentForm({
         </div>
       ) : null}
 
+      {registrationLocked ? (
+        <p className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-xs leading-5 text-amber-800">
+          This browser already has a registration. One student can be
+          registered per browser.
+        </p>
+      ) : null}
+
       <div>
         <label className="text-sm font-medium text-ink" htmlFor={nameId}>
           Student name
         </label>
         <input
-          aria-describedby={fieldErrors.name ? nameErrorId : undefined}
-          aria-invalid={fieldErrors.name ? true : undefined}
+          aria-describedby={
+            fieldErrors.name
+              ? nameErrorId
+              : nameWarningMessage
+                ? nameWarningId
+                : undefined
+          }
+          aria-invalid={
+            fieldErrors.name || nameHasBlockingConflict ? true : undefined
+          }
           autoCapitalize="words"
           autoComplete="off"
-          className={inputClassName(Boolean(fieldErrors.name))}
+          className={inputClassName(
+            Boolean(fieldErrors.name || nameHasBlockingConflict),
+          )}
           enterKeyHint="next"
           id={nameId}
           maxLength={MAX_STUDENT_NAME_LENGTH}
@@ -218,12 +298,21 @@ export default function AddStudentForm({
           >
             {fieldErrors.name}
           </p>
+        ) : nameWarningMessage ? (
+          <p
+            className={`mt-1.5 text-xs font-medium ${
+              nameHasBlockingConflict ? "text-rose-600" : "text-amber-700"
+            }`}
+            id={nameWarningId}
+          >
+            {nameWarningMessage}
+          </p>
         ) : null}
       </div>
 
       <div>
         <label className="text-sm font-medium text-ink" htmlFor={classId}>
-          Class / section
+          Section
         </label>
         <input
           aria-describedby={fieldErrors.classSection ? classErrorId : undefined}
@@ -236,7 +325,7 @@ export default function AddStudentForm({
           maxLength={MAX_CLASS_SECTION_LENGTH}
           name="classSection"
           onChange={handleClassChange}
-          placeholder="e.g. Computer Science"
+          placeholder="e.g. A, B, C, D"
           required
           type="text"
           value={classSection}
@@ -305,8 +394,8 @@ export default function AddStudentForm({
 
       {!hasAnyOpenSeats ? (
         <p className="rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-3 text-xs leading-5 text-rose-700">
-          Every seat is currently taken. Ask someone to remove a student before
-          adding a new one.
+          Every seat is currently taken. A registered student must remove their
+          own entry before someone else can register.
         </p>
       ) : null}
 
@@ -320,7 +409,13 @@ export default function AddStudentForm({
         </button>
         <button
           className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-brand px-4 text-sm font-semibold text-white transition hover:bg-brand-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 disabled:bg-stone-200 disabled:text-stone-400"
-          disabled={submitting || isTableFull || !hasAnyOpenSeats}
+          disabled={
+            submitting ||
+            registrationLocked ||
+            nameHasBlockingConflict ||
+            isTableFull ||
+            !hasAnyOpenSeats
+          }
           type="submit"
         >
           {submitting ? (

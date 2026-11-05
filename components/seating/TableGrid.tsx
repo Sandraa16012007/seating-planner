@@ -6,6 +6,8 @@ import type { SeatingPlan } from "@/types/seating";
 
 type TableGridProps = {
   plan: SeatingPlan;
+  canRegister: boolean;
+  registrationPending: boolean;
   onOpenDetails: (tableNumber: number) => void;
   onAddStudent: (tableNumber: number) => void;
 };
@@ -19,6 +21,8 @@ const legend = [
 
 export default function TableGrid({
   plan,
+  canRegister,
+  registrationPending,
   onOpenDetails,
   onAddStudent,
 }: TableGridProps) {
@@ -37,7 +41,7 @@ export default function TableGrid({
             Choose your table
           </h2>
           <p className="mt-1 max-w-md text-sm leading-6 text-stone-500">
-            Tap a table to see who is seated or save a spot for a friend.
+            Tap a table to see who is seated or register your own spot.
           </p>
         </div>
 
@@ -61,8 +65,8 @@ export default function TableGrid({
         >
           <AlertCircleIcon className="mt-0.5 h-5 w-5 shrink-0 text-rose-500" />
           <p>
-            <strong className="font-semibold">Every seat is taken.</strong>{" "}
-            Remove a student from a table to open a seat.
+            <strong className="font-semibold">Every seat is taken.</strong> A
+            registered student must remove their own entry to open a seat.
           </p>
         </div>
       ) : null}
@@ -70,9 +74,11 @@ export default function TableGrid({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {plan.map((table) => (
           <TableCard
+            canRegister={canRegister}
             key={table.tableNumber}
             onAddStudent={onAddStudent}
             onOpenDetails={onOpenDetails}
+            registrationPending={registrationPending}
             table={table}
           />
         ))}

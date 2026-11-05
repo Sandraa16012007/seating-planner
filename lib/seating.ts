@@ -86,8 +86,8 @@ export async function getSeatingPlan(): Promise<SeatingPlan> {
 }
 
 /**
- * Adds a student through the add_student RPC. The database enforces name
- * uniqueness and capacity; errors are surfaced as SeatingError.
+ * Adds a student through the add_student RPC. The database enforces a single
+ * registration per ownership token, name uniqueness and capacity.
  */
 export async function addStudent(input: AddStudentInput): Promise<Student> {
   const supabase = createSupabaseServerClient();
@@ -96,6 +96,7 @@ export async function addStudent(input: AddStudentInput): Promise<Student> {
     p_name: input.name,
     p_class_section: input.classSection,
     p_table_number: input.tableNumber,
+    p_ownership_token: input.ownershipToken,
   });
 
   if (error) {
@@ -112,14 +113,44 @@ export async function addStudent(input: AddStudentInput): Promise<Student> {
 }
 
 /**
- * Removes a student by record id. Returns false when the record was already
- * removed, which is harmless for a shared public planner.
+ * Resolves the student registered by this browser token. The token itself is
+ * never stored in the database and is hashed inside the RPC.
  */
-export async function removeStudent(studentId: string): Promise<boolean> {
+export async function getOwnedStudent(
+  ownershipToken: string,
+): Promise<Student | null> {
   const supabase = createSupabaseServerClient();
 
-  const { data, error } = await supabase.rpc("remove_student", {
+  const { data, error } = await supabase.rpc("get_owned_student", {
+    p_ownership_token: ownershipToken,
+  });
+
+  if (error) {
+    throw new SeatingError(error.message, error.code);
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+
+  if (!row?.id) {
+    return null;
+  }
+
+  return mapStudent(row);
+}
+
+/**
+ * Deletes a student only when the supplied browser token belongs to that exact
+ * row. A false result means the id/token pair did not match.
+ */
+export async function removeOwnedStudent(
+  studentId: string,
+  ownershipToken: string,
+): Promise<boolean> {
+  const supabase = createSupabaseServerClient();
+
+  const { data, error } = await supabase.rpc("remove_owned_student", {
     p_student_id: studentId,
+    p_ownership_token: ownershipToken,
   });
 
   if (error) {

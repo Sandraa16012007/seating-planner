@@ -8,12 +8,16 @@ import type { SeatingTable } from "@/types/seating";
 
 type TableCardProps = {
   table: SeatingTable;
+  canRegister: boolean;
+  registrationPending: boolean;
   onOpenDetails: (tableNumber: number) => void;
   onAddStudent: (tableNumber: number) => void;
 };
 
 export default function TableCard({
   table,
+  canRegister,
+  registrationPending,
   onOpenDetails,
   onAddStudent,
 }: TableCardProps) {
@@ -21,6 +25,7 @@ export default function TableCard({
   const openSeats = getOpenSeats(table);
   const status = getTableStatus(table);
   const isFull = status === "full";
+  const addDisabled = isFull || !canRegister;
   const visibleStudents = table.students.slice(0, 3);
   const hiddenCount = table.students.length - visibleStudents.length;
 
@@ -106,16 +111,20 @@ export default function TableCard({
 
         <button
           className={`pointer-events-auto mt-3 inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl px-3 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
-            isFull
+            addDisabled
               ? "pointer-events-none bg-stone-100 text-stone-400"
               : "bg-brand text-white hover:bg-brand-dark active:scale-[0.99]"
           }`}
-          disabled={isFull}
+          disabled={addDisabled}
           onClick={() => onAddStudent(table.tableNumber)}
           type="button"
         >
           {isFull ? (
             "Table full"
+          ) : registrationPending ? (
+            "Checking registration…"
+          ) : !canRegister ? (
+            "Already registered"
           ) : (
             <>
               <PlusIcon className="h-4 w-4" />

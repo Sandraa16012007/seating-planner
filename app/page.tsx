@@ -33,8 +33,7 @@ export default function Home() {
             <span className="text-brand/80">Find your people.</span>
           </h1>
           <p className="mx-auto mt-4 max-w-md text-sm leading-6 text-stone-500 sm:text-base">
-            Choose a table, see who&apos;s seated, and save a spot for yourself
-            or a friend.
+            Choose a table, see who&apos;s seated, and register your own spot.
           </p>
         </section>
 
@@ -46,8 +45,9 @@ export default function Home() {
       <footer className="mt-12 border-t border-stone-200/80 pt-5 text-xs leading-5 text-stone-500">
         <p>
           <strong className="font-medium text-stone-500">Public planner:</strong>{" "}
-          no accounts or sign-in. Anyone with the link can add or remove
-          students.
+          no accounts or sign-in. Anyone with the link can view the seating
+          arrangement, but each browser can register and remove only one
+          student.
         </p>
         <p className="mt-1">
           Refresh the page to see changes made by other visitors.

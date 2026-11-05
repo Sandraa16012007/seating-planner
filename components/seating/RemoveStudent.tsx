@@ -10,22 +10,27 @@ import type { Student } from "@/types/seating";
 type RemoveStudentProps = {
   student: Student;
   tableNumber: number;
+  canRemove: boolean;
+  ownershipToken: string | null;
   onRemoved: (studentName: string) => void;
 };
 
 export default function RemoveStudent({
   student,
   tableNumber,
+  canRemove,
+  ownershipToken,
   onRemoved,
 }: RemoveStudentProps) {
   const [confirming, setConfirming] = useState(false);
 
-  if (confirming) {
+  if (confirming && canRemove && ownershipToken) {
     return (
       <li>
         <RemoveStudentConfirm
           onCancel={() => setConfirming(false)}
           onRemoved={onRemoved}
+          ownershipToken={ownershipToken}
           student={student}
           tableNumber={tableNumber}
         />
@@ -44,14 +49,20 @@ export default function RemoveStudent({
         </p>
       </div>
 
-      <button
-        aria-label={`Remove ${student.name}`}
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-stone-400 transition hover:bg-rose-50 hover:text-rose-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
-        onClick={() => setConfirming(true)}
-        type="button"
-      >
-        <TrashIcon className="h-4 w-4" />
-      </button>
+      {canRemove ? (
+        <button
+          aria-label={`Remove ${student.name}`}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-stone-400 transition hover:bg-rose-50 hover:text-rose-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
+          onClick={() => setConfirming(true)}
+          type="button"
+        >
+          <TrashIcon className="h-4 w-4" />
+        </button>
+      ) : (
+        <span className="shrink-0 rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-stone-500">
+          View only
+        </span>
+      )}
     </li>
   );
 }
@@ -59,6 +70,7 @@ export default function RemoveStudent({
 type RemoveStudentConfirmProps = {
   student: Student;
   tableNumber: number;
+  ownershipToken: string;
   onCancel: () => void;
   onRemoved: (studentName: string) => void;
 };
@@ -66,6 +78,7 @@ type RemoveStudentConfirmProps = {
 function RemoveStudentConfirm({
   student,
   tableNumber,
+  ownershipToken,
   onCancel,
   onRemoved,
 }: RemoveStudentConfirmProps) {
@@ -105,10 +118,11 @@ function RemoveStudentConfirm({
   return (
     <div className="toast-enter rounded-2xl border border-rose-200 bg-rose-50/80 p-3">
       <p className="text-sm font-semibold text-rose-900">
-        Remove {student.name}?
+        Remove your entry for {student.name}?
       </p>
       <p className="mt-1 text-xs leading-5 text-rose-700/80">
-        Their seat at Table {tableNumber} will become available.
+        Your seat at Table {tableNumber} will become available. Only this
+        browser can perform this removal.
       </p>
 
       {error ? (
@@ -123,6 +137,11 @@ function RemoveStudentConfirm({
       <form className="mt-3 flex gap-2" onSubmit={handleSubmit}>
         <input name="studentId" type="hidden" value={student.id} />
         <input name="studentName" type="hidden" value={student.name} />
+        <input
+          name="ownershipToken"
+          type="hidden"
+          value={ownershipToken}
+        />
 
         <button
           autoFocus

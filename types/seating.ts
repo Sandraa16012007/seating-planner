@@ -21,4 +21,5 @@ export type AddStudentInput = {
   name: string;
   classSection: string;
   tableNumber: number;
+  ownershipToken: string;
 };

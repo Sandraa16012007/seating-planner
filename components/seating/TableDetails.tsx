@@ -20,6 +20,10 @@ type DetailsNotice = {
 type TableDetailsProps = {
   table: SeatingTable;
   notice: DetailsNotice | null;
+  ownedStudentId: string | null;
+  ownershipToken: string | null;
+  canRegister: boolean;
+  registrationPending: boolean;
   onAdd: () => void;
   onRemoved: (studentName: string) => void;
   onClose: () => void;
@@ -28,6 +32,10 @@ type TableDetailsProps = {
 export default function TableDetails({
   table,
   notice,
+  ownedStudentId,
+  ownershipToken,
+  canRegister,
+  registrationPending,
   onAdd,
   onRemoved,
   onClose,
@@ -36,6 +44,7 @@ export default function TableDetails({
   const openSeats = getOpenSeats(table);
   const status = getTableStatus(table);
   const isFull = openSeats === 0;
+  const addDisabled = isFull || !canRegister;
 
   return (
     <div>
@@ -103,8 +112,12 @@ export default function TableDetails({
         <ul className="mt-3 space-y-2">
           {table.students.map((student) => (
             <RemoveStudent
+              canRemove={
+                student.id === ownedStudentId && Boolean(ownershipToken)
+              }
               key={student.id}
               onRemoved={onRemoved}
+              ownershipToken={ownershipToken}
               student={student}
               tableNumber={table.tableNumber}
             />
@@ -114,7 +127,8 @@ export default function TableDetails({
 
       {isFull ? (
         <p className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-3 text-xs leading-5 text-rose-700">
-          This table is full. Remove a student to free a seat.
+          This table is full. The owner of an entry must remove it to free a
+          seat.
         </p>
       ) : null}
 
@@ -129,12 +143,16 @@ export default function TableDetails({
         </button>
         <button
           className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-brand px-4 text-sm font-semibold text-white transition hover:bg-brand-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 disabled:bg-stone-200 disabled:text-stone-400"
-          disabled={isFull}
+          disabled={addDisabled}
           onClick={onAdd}
           type="button"
         >
           {isFull ? (
             "Table is full"
+          ) : registrationPending ? (
+            "Checking registration…"
+          ) : !canRegister ? (
+            "Already registered"
           ) : (
             <>
               <PlusIcon className="h-4 w-4" />
